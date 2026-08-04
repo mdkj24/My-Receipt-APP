@@ -237,14 +237,42 @@
     function triggerCamera() { document.getElementById('cameraInput').click(); }
     function triggerFileSelect() { document.getElementById('fileInput').click(); }
 
-    // ⚡ ⭐ 核心：直連 Gemini 1.5 Flash Vision API 進行辨識
+    // 🖼️ 圖片壓縮工具 (解決 iPhone 原圖檔案過大問題)
+    function compressImage(file, maxWidth) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 導出 JPEG 格式，品質 0.8
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl.split(',')[1]);
+        };
+        img.onerror = (err) => reject(err);
+      });
+    }
+
+    // ⚡ ⭐ 核心：直連 Gemini 1.5 Flash API (包含圖片壓縮與完整錯誤診斷)
     async function handleFileSelected(event) {
       const file = event.target.files[0];
       if (!file) return;
 
       const apiKey = localStorage.getItem('ocr_apikey');
       if (!apiKey) {
-        alert("請點擊右上角齒輪設定，貼上您的 Gemini API Key 才能啟用 AI 自動辨識！");
+        alert("【尚未設定 API Key】\n請點擊右上角齒輪設定，貼上您的 Gemini API Key 才能啟用自動辨識！");
         openSettingsModal();
         event.target.value = '';
         return;
@@ -252,33 +280,41 @@
 
       // 變更 UI 為辨識中狀態
       const btnText = document.getElementById('camBtnText');
-      const originalText = btnText.innerText;
-      btnText.innerText = "Gemini AI 辨識中...";
+      const originalText = btnText ? btnText.innerText : '開啟相機拍照';
+      if (btnText) btnText.innerText = "圖片壓縮與 AI 辨識中...";
 
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        const base64Image = e.target.result.split(',')[1];
+      try {
+        // 1. 先將 iPhone 照片壓縮至最長邊 1200px (防止傳輸失敗)
+        const base64Image = await compressImage(file, 1200);
 
-        try {
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { 
-                    text: '請分析這張發票/收據照片，提取資訊並直接輸出嚴格的 JSON 格式（不要包含 markdown ``` 標籤）：' +
-                          '{"date":"YYYY-MM-DD","category":"機票/住宿/城市稅/租車/計程車/過路費/停車/加油/交際費/網卡/參展證/其他","currency":"NTD/EUR/USD/JPY","amount":0.00,"cardNo":"卡號末四碼或CASH","note":"備註或明細說明"}' 
-                  },
-                  { inline_data: { mime_type: file.type || 'image/jpeg', data: base64Image } }
-                ]
-              }]
-            })
-          });
+        // 2. 發送至 Google Gemini 1.5 Flash Vision API
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { 
+                  text: '請分析這張發票/收據照片，提取資訊並直接輸出嚴格的 JSON 格式（絕對不要包含 markdown ```json 標籤）：' +
+                        '{"date":"YYYY-MM-DD","category":"機票/住宿/城市稅/租車/計程車/過路費/停車/加油/交際費/網卡/參展證/其他","currency":"NTD/EUR/USD/JPY","amount":0.00,"cardNo":"卡號末四碼或CASH","note":"備註或明細說明"}' 
+                },
+                { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
+              ]
+            }]
+          })
+        });
 
-          const resData = await response.json();
-          if (resData.error) throw new Error(resData.error.message);
+        const resData = await response.json();
 
-          // 解析 AI 回傳的 JSON 數據
-          let rawText = resData.candidates[0].content.parts[0].text.trim();
-          rawText = rawText.replace(/
+        // API 報錯診斷
+        if (resData.error) {
+          throw new Error(`[Google API 錯誤 ${resData.error.code}]: ${resData.error.message}`);
+        }
+
+        if (!resData.candidates || !resData.candidates[0]) {
+          throw new Error("AI 無法解讀此照片，請重新拍攝清晰一點的發票。");
+        }
+
+        // 3. 解析 AI 回傳數據
+        let rawText = resData.candidates[0].content.parts[0].text.trim();
+        rawText = rawText.replace(/
