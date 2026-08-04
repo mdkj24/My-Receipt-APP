@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>差旅發票報帳小幫手 (純前端離線版)</title>
+  <title>差旅發票報帳小幫手</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,8 +18,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- SheetJS (Excel 匯出) -->
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <!-- Tesseract.js (純前端離線 OCR 引擎，免 API Key) -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     body {
@@ -44,67 +42,32 @@
   <header class="sticky top-0 z-20 glass-nav border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
     <div class="flex items-center gap-2">
       <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow">
-        <i class="fa-solid fa-receipt text-lg"></i>
+        <i class="fa-solid fa-pen-to-square text-lg"></i>
       </div>
       <div>
         <h1 class="font-bold text-base text-slate-900">差旅發票報帳小幫手</h1>
-        <p class="text-[11px] text-slate-500">離線 OCR 引擎 ‧ 免 API Key ‧ 匯出 Excel</p>
+        <p class="text-[11px] text-slate-500">依刷卡帳單實報 ‧ 匯出 Excel</p>
       </div>
     </div>
-    <button onclick="toggleDebugConsole()" class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center" title="查看 OCR 辨識結果">
-      <i class="fa-solid fa-terminal"></i>
-    </button>
   </header>
 
   <!-- 主要內容區 -->
   <main class="flex-1 p-4 max-w-lg mx-auto w-full space-y-4">
 
-    <!-- 📷 相機拍攝區 -->
-    <section class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
-      <div class="inline-block px-2.5 py-0.5 bg-white/20 rounded-full text-[11px] font-semibold mb-2">
-        🔒 100% 免費 ‧ 離線本地辨識 ‧ 無配額限制
-      </div>
-      <h2 class="text-lg font-bold mb-1">拍攝發票 / 費用單據</h2>
-      <p class="text-blue-100 text-xs mb-4">拍照後手機將自動掃描文字，提取日期與金額。</p>
-      
-      <div class="flex gap-2">
-        <label for="cameraInput" class="flex-1 bg-white text-blue-600 font-bold py-3.5 px-4 rounded-xl shadow active:bg-blue-50 transition flex items-center justify-center gap-2 text-sm text-center cursor-pointer">
-          <i class="fa-solid fa-camera text-base"></i>
-          <span id="camText">開啟相機拍照</span>
-        </label>
-
-        <label for="fileInput" class="bg-white/20 text-white font-semibold py-3.5 px-4 rounded-xl active:bg-white/30 transition flex items-center justify-center text-sm cursor-pointer">
-          <i class="fa-solid fa-image text-base"></i>
-        </label>
-      </div>
-
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
-      <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
-    </section>
-
-    <!-- 🐛 Debug 終端機面板 (顯示原始 OCR 掃描出來的所有字串) -->
-    <section id="debugSection" class="hidden bg-slate-900 text-emerald-400 rounded-2xl p-4 font-mono text-xs shadow space-y-2">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-2 text-slate-300">
-        <span class="font-bold">OCR 掃描原始文字紀錄</span>
-        <button onclick="clearLogs()" class="text-[10px] bg-slate-800 px-2 py-1 rounded">清空</button>
-      </div>
-      <div id="debugLogs" class="max-h-40 overflow-y-auto space-y-1 text-[11px] break-all"></div>
-    </section>
-
-    <!-- 📝 資料核對與編輯區 -->
-    <section id="editArea" class="hidden bg-white rounded-2xl p-4 shadow border border-blue-200 space-y-3">
+    <!-- ✍️ 報帳輸入面板 -->
+    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
       <div class="flex items-center justify-between border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-          <i class="fa-solid fa-pen-to-square text-blue-600"></i>
-          <span>核對 / 修改 掃描結果</span>
-        </h3>
-        <button onclick="closeEditArea()" class="text-xs text-slate-400">關閉</button>
+        <h2 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-plus text-blue-600"></i>
+          <span>新增發票 / 費用明細</span>
+        </h2>
+        <span class="text-[10px] bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full">依刷卡單實報</span>
       </div>
 
-      <div class="space-y-2 text-xs">
+      <form id="entryForm" onsubmit="handleFormSubmit(event)" class="space-y-3 text-xs">
         <div>
           <label class="font-semibold text-slate-600 block mb-1">費用分類</label>
-          <select id="inputCategory" class="w-full bg-slate-50 border rounded-xl p-2 font-medium">
+          <select id="inputCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium outline-none focus:ring-2 focus:ring-blue-500">
             <option value="機票">機票</option>
             <option value="住宿">住宿</option>
             <option value="城市稅">城市稅</option>
@@ -123,11 +86,11 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="font-semibold text-slate-600 block mb-1">日期 (DAY)</label>
-            <input type="date" id="inputDate" class="w-full bg-slate-50 border rounded-xl p-2">
+            <input type="date" id="inputDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium outline-none focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
             <label class="font-semibold text-slate-600 block mb-1">幣別</label>
-            <select id="inputCurrency" onchange="autoCalcNTD()" class="w-full bg-slate-50 border rounded-xl p-2 font-bold">
+            <select id="inputCurrency" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500">
               <option value="NTD">NTD</option>
               <option value="EUR">EUR</option>
               <option value="USD">USD</option>
@@ -139,55 +102,67 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="font-semibold text-slate-600 block mb-1">原幣金額 ($)</label>
-            <input type="number" step="0.01" id="inputAmount" oninput="autoCalcNTD()" class="w-full bg-slate-50 border rounded-xl p-2 font-bold">
+            <input type="number" step="0.01" id="inputAmount" placeholder="0.00" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
             <label class="font-semibold text-slate-600 block mb-1">卡號 / CASH</label>
-            <input type="text" id="inputCardNo" placeholder="例: 1234 或 CASH" class="w-full bg-slate-50 border rounded-xl p-2">
+            <input type="text" id="inputCardNo" placeholder="例: 1234 或 CASH" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium outline-none focus:ring-2 focus:ring-blue-500">
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="font-semibold text-slate-600 block mb-1">台幣折算 (NTD)</label>
-            <input type="number" id="inputNtd" class="w-full bg-slate-50 border rounded-xl p-2 font-bold">
+        <!-- 💳 依據刷卡單實報的台幣金額區 -->
+        <div class="bg-amber-50/60 p-3 rounded-xl border border-amber-200 space-y-2">
+          <div class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+            <i class="fa-solid fa-credit-card"></i>
+            <span>帳單實扣台幣金額 (NTD / TOTAL)</span>
           </div>
-          <div>
-            <label class="font-semibold text-slate-600 block mb-1">TOTAL 金額</label>
-            <input type="number" id="inputTotal" class="w-full bg-slate-50 border rounded-xl p-2 font-bold">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-semibold text-slate-600 block mb-1">台幣 NTD</label>
+              <input type="number" id="inputNtd" oninput="syncTotalWithNtd()" placeholder="刷卡單台幣" class="w-full bg-white border border-slate-200 rounded-xl p-2 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="font-semibold text-slate-600 block mb-1">TOTAL 金額</label>
+              <input type="number" id="inputTotal" placeholder="刷卡單台幣" class="w-full bg-white border border-slate-200 rounded-xl p-2 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
           </div>
+          <p class="text-[10px] text-amber-700 leading-tight">※ 若為 CASH (現金支付)，NTD 與 TOTAL 可留空或填 0。</p>
         </div>
 
         <div>
-          <label class="font-semibold text-slate-600 block mb-1">註 (備註)</label>
-          <input type="text" id="inputNote" placeholder="例：午餐MAK" class="w-full bg-slate-50 border rounded-xl p-2">
+          <label class="font-semibold text-slate-600 block mb-1">註 (備註說明)</label>
+          <input type="text" id="inputNote" placeholder="例：午餐MAK / 一半代墊Sam / 無單據" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium outline-none focus:ring-2 focus:ring-blue-500">
         </div>
-      </div>
 
-      <button onclick="saveRecordFromArea()" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">
-        確認並新增至報帳列表
-      </button>
+        <button type="submit" class="w-full bg-blue-600 active:bg-blue-700 text-white font-bold py-3 rounded-xl text-xs shadow transition">
+          ➕ 新增至報帳明細表
+        </button>
+      </form>
     </section>
 
-    <!-- 明細列表 -->
+    <!-- 📋 已登記列表 -->
     <section class="space-y-2">
       <div class="flex items-center justify-between px-1">
-        <h3 class="font-bold text-slate-700 text-sm">已登記報帳明細</h3>
-        <button onclick="clearAll()" class="text-xs text-slate-400 hover:text-red-500">清空明細</button>
+        <h3 class="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+          <span>待核銷明細</span>
+          <span id="recordBadge" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+        </h3>
+        <button onclick="clearAll()" class="text-xs text-slate-400 hover:text-red-500 transition">清空所有</button>
       </div>
+
       <div id="recordsContainer" class="space-y-2"></div>
     </section>
 
   </main>
 
-  <!-- 底部固定匯出按鈕 -->
+  <!-- 底部匯出按鈕 -->
   <footer class="sticky bottom-0 z-20 glass-nav border-t border-slate-200 p-4 max-w-lg mx-auto w-full">
     <div class="flex items-center justify-between gap-3">
       <div>
         <div class="text-[11px] text-slate-400">總計筆數</div>
         <div id="totalCount" class="text-lg font-bold text-slate-900">0 筆</div>
       </div>
-      <button onclick="exportToExcel()" class="bg-emerald-600 active:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl shadow text-sm flex items-center gap-2">
+      <button onclick="exportToExcel()" class="bg-emerald-600 active:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl shadow text-sm flex items-center gap-2 transition">
         <i class="fa-solid fa-file-excel"></i>
         <span>匯出 Excel 報帳表</span>
       </button>
@@ -195,26 +170,7 @@
   </footer>
 
   <script>
-    let records = JSON.parse(localStorage.getItem('receipt_records_v5') || '[]');
-    let editingId = null;
-    let tesseractWorker = null;
-
-    function logDebug(msg, type = 'info') {
-      const logs = document.getElementById('debugLogs');
-      const time = new Date().toLocaleTimeString();
-      const div = document.createElement('div');
-      div.className = type === 'error' ? 'text-red-400 font-bold' : (type === 'warn' ? 'text-amber-300' : 'text-emerald-400');
-      div.innerText = `[${time}] ${msg}`;
-      logs.appendChild(div);
-      logs.scrollTop = logs.scrollHeight;
-    }
-
-    function toggleDebugConsole() {
-      document.getElementById('debugSection').classList.toggle('hidden');
-    }
-    function clearLogs() {
-      document.getElementById('debugLogs').innerHTML = '';
-    }
+    let records = JSON.parse(localStorage.getItem('receipt_records_bill') || '[]');
 
     (function setupPWA() {
       const manifest = {
@@ -231,149 +187,52 @@
     })();
 
     window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
       renderRecords();
-      logDebug("離線模式已就緒，無須連線與 API Key。");
     });
 
-    // ⚡ ⭐ 核心：純前端 Tesseract.js OCR 文字掃描與 RegEx 自動匹配
-    async function handleFileSelected(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const btnText = document.getElementById('camText');
-      btnText.innerText = "手機本地掃描中...";
-
-      try {
-        logDebug("開始載入本地 OCR 引擎 (繁體中文+英文)...");
-
-        if (!tesseractWorker) {
-          tesseractWorker = await Tesseract.createWorker('chi_tra+eng');
-        }
-
-        logDebug("正在分析圖片中的文字與數字...");
-        const ret = await tesseractWorker.recognize(file);
-        const text = ret.data.text;
-
-        logDebug("--- OCR 辨識出的文字原始內容 ---");
-        logDebug(text);
-        logDebug("-------------------------------");
-
-        // 1. 自動匹配日期 (RegEx 尋找 YYYY-MM-DD 或 YYYY/MM/DD)
-        let detectedDate = new Date().toISOString().split('T')[0];
-        const dateMatch = text.match(/\b(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
-        if (dateMatch) {
-          const y = dateMatch[1];
-          const m = dateMatch[2].padStart(2, '0');
-          const d = dateMatch[3].padStart(2, '0');
-          detectedDate = `${y}-${m}-${d}`;
-          logDebug(`匹配到日期: ${detectedDate}`);
-        }
-
-        // 2. 自動匹配金額 (尋找 $、EUR、NTD 或數字組合)
-        let detectedAmount = 0;
-        const amountMatches = [...text.matchAll(/(?:NTD|EUR|USD|\$|總計|金額|TOTAL)\s*[:：]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/gi)];
-        if (amountMatches.length > 0) {
-          // 取最後一個出現的匹配金額 (發票總額通常在下方)
-          const lastMatch = amountMatches[amountMatches.length - 1][1];
-          detectedAmount = parseFloat(lastMatch.replace(/,/g, '')) || 0;
-          logDebug(`匹配到金額: $${detectedAmount}`);
-        } else {
-          // 若無特徵詞，尋找較大的純數字
-          const pureNumbers = text.match(/\b\d{2,6}(?:\.\d{2})?\b/g);
-          if (pureNumbers) {
-            const numArr = pureNumbers.map(n => parseFloat(n)).filter(n => !isNaN(n));
-            detectedAmount = Math.max(...numArr, 0);
-            logDebug(`自動提取較大數字金額: $${detectedAmount}`);
-          }
-        }
-
-        // 3. 自動匹配幣別
-        let detectedCurrency = 'NTD';
-        if (/EUR|€/i.test(text)) detectedCurrency = 'EUR';
-        else if (/USD|\$/i.test(text)) detectedCurrency = 'USD';
-        else if (/JPY|￥/i.test(text)) detectedCurrency = 'JPY';
-
-        // 計算 NTD 金額
-        const rates = { NTD: 1, EUR: 35, USD: 32, JPY: 0.22 };
-        const rate = rates[detectedCurrency] || 1;
-        const calculatedNtd = detectedCurrency === 'NTD' ? detectedAmount : Math.round(detectedAmount * rate);
-
-        showEditArea({
-          date: detectedDate,
-          category: '其他',
-          currency: detectedCurrency,
-          amount: detectedAmount,
-          cardNo: '',
-          ntd: calculatedNtd,
-          total: calculatedNtd,
-          note: ''
-        });
-
-      } catch (err) {
-        logDebug(`OCR 處理失敗: ${err.message}`, "error");
-        alert("照片處理失敗：\n" + err.message);
-      } finally {
-        btnText.innerText = "開啟相機拍照";
-        e.target.value = '';
-      }
+    // 當輸入台幣金額時，自動連動 TOTAL 金額
+    function syncTotalWithNtd() {
+      const ntdVal = document.getElementById('inputNtd').value;
+      document.getElementById('inputTotal').value = ntdVal;
     }
 
-    function autoCalcNTD() {
-      const curr = document.getElementById('inputCurrency').value;
-      const amt = parseFloat(document.getElementById('inputAmount').value) || 0;
-      const rates = { NTD: 1, EUR: 35, USD: 32, JPY: 0.22 };
-      const ntd = curr === 'NTD' ? amt : Math.round(amt * (rates[curr] || 1));
-      document.getElementById('inputNtd').value = ntd;
-      document.getElementById('inputTotal').value = ntd;
-    }
+    // 表單送出
+    function handleFormSubmit(e) {
+      e.preventDefault();
 
-    function showEditArea(data = null) {
-      document.getElementById('editArea').classList.remove('hidden');
-      if (data) {
-        document.getElementById('inputCategory').value = data.category || '其他';
-        document.getElementById('inputDate').value = data.date || new Date().toISOString().split('T')[0];
-        document.getElementById('inputCurrency').value = data.currency || 'NTD';
-        document.getElementById('inputAmount').value = data.amount || 0;
-        document.getElementById('inputCardNo').value = data.cardNo || '';
-        document.getElementById('inputNtd').value = data.ntd || 0;
-        document.getElementById('inputTotal').value = data.total || 0;
-        document.getElementById('inputNote').value = data.note || '';
-      }
-      document.getElementById('editArea').scrollIntoView({ behavior: 'smooth' });
-    }
+      const ntdRaw = document.getElementById('inputNtd').value;
+      const totalRaw = document.getElementById('inputTotal').value;
 
-    function closeEditArea() {
-      document.getElementById('editArea').classList.add('hidden');
-      editingId = null;
-    }
-
-    function saveRecordFromArea() {
       const item = {
-        id: editingId || Date.now().toString(),
+        id: Date.now().toString(),
         category: document.getElementById('inputCategory').value,
         date: document.getElementById('inputDate').value,
         currency: document.getElementById('inputCurrency').value,
         amount: parseFloat(document.getElementById('inputAmount').value) || 0,
         cardNo: document.getElementById('inputCardNo').value.trim(),
-        ntd: parseFloat(document.getElementById('inputNtd').value) || 0,
-        total: parseFloat(document.getElementById('inputTotal').value) || 0,
+        ntd: ntdRaw === '' ? '' : (parseFloat(ntdRaw) || 0),
+        total: totalRaw === '' ? '' : (parseFloat(totalRaw) || 0),
         note: document.getElementById('inputNote').value.trim()
       };
 
-      if (editingId) {
-        const idx = records.findIndex(r => r.id === editingId);
-        if (idx !== -1) records[idx] = item;
-      } else {
-        records.push(item);
-      }
-
-      localStorage.setItem('receipt_records_v5', JSON.stringify(records));
+      records.push(item);
+      localStorage.setItem('receipt_records_bill', JSON.stringify(records));
       renderRecords();
-      closeEditArea();
+
+      // 清空，方便填下一筆
+      document.getElementById('inputAmount').value = '';
+      document.getElementById('inputNtd').value = '';
+      document.getElementById('inputTotal').value = '';
+      document.getElementById('inputNote').value = '';
+      document.getElementById('inputCardNo').value = '';
+
+      document.getElementById('inputAmount').focus();
     }
 
     function renderRecords() {
       const container = document.getElementById('recordsContainer');
+      document.getElementById('recordBadge').innerText = records.length;
       document.getElementById('totalCount').innerText = `${records.length} 筆`;
 
       if (records.length === 0) {
@@ -381,56 +240,93 @@
         return;
       }
 
-      container.innerHTML = records.map((r, i) => `
-        <div class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex items-center justify-between text-xs">
-          <div>
-            <div class="font-bold text-slate-800">#${i+1} [${r.category}] ${r.currency} $${r.amount}</div>
-            <div class="text-slate-400 mt-0.5">${r.date} ‧ 付款: ${r.cardNo || '無'} ‧ 註: ${r.note || '無'}</div>
+      container.innerHTML = records.map((r, i) => {
+        let formattedDay = r.date;
+        if (r.date) {
+          const d = new Date(r.date);
+          if (!isNaN(d.getTime())) formattedDay = `${d.getMonth() + 1}月${d.getDate()}日`;
+        }
+
+        const displayNtd = (r.ntd === '' || r.ntd === 0) ? '0' : r.ntd.toLocaleString();
+
+        return `
+          <div class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex items-center justify-between text-xs">
+            <div>
+              <div class="font-bold text-slate-800">#${i+1} [${r.category}] ${r.currency} $${r.amount}</div>
+              <div class="text-slate-400 mt-0.5">${formattedDay} ‧ 卡號/付款: ${r.cardNo || '無'} ‧ 註: ${r.note || '無'}</div>
+            </div>
+            <div class="text-right">
+              <div class="font-extrabold text-slate-900">NTD ${displayNtd}</div>
+              <button onclick="removeRecord('${r.id}')" class="text-red-500 font-semibold text-[10px] mt-1">刪除</button>
+            </div>
           </div>
-          <div class="text-right">
-            <div class="font-extrabold text-slate-900">NTD ${r.ntd}</div>
-            <button onclick="removeRecord('${r.id}')" class="text-red-500 font-semibold text-[10px] mt-1">刪除</button>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function removeRecord(id) {
-      if (confirm('確定刪除？')) {
-        records = records.filter(r => r.id !== id);
-        localStorage.setItem('receipt_records_v5', JSON.stringify(records));
-        renderRecords();
-      }
+      records = records.filter(r => r.id !== id);
+      localStorage.setItem('receipt_records_bill', JSON.stringify(records));
+      renderRecords();
     }
 
     function clearAll() {
-      if (records.length && confirm('確定清空？')) {
+      if (records.length && confirm('確定要清空所有已登記的明細嗎？')) {
         records = [];
-        localStorage.setItem('receipt_records_v5', JSON.stringify(records));
+        localStorage.setItem('receipt_records_bill', JSON.stringify(records));
         renderRecords();
       }
     }
 
+    // 匯出完全對齊 Excel 格式
     function exportToExcel() {
-      if (!records.length) return alert('無資料可匯出！');
-      const data = records.map((r, i) => ({
-        "項次": i + 1,
-        "DAY": r.date,
-        "分類": r.category,
-        "幣別": r.currency,
-        "$": r.amount,
-        "刷卡金額": r.amount,
-        "卡號": r.cardNo,
-        "NTD": r.ntd,
-        "TOTAL": r.total,
-        "註": r.note,
-        "Check": ""
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 8 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "差旅核銷表");
-      XLSX.writeFile(wb, `差旅報帳明細表_${new Date().toISOString().split('T')[0]}.xlsx`);
+      if (!records.length) return alert('目前沒有任何記錄可供匯出！');
+
+      const excelData = records.map((r, index) => {
+        let formattedDay = r.date;
+        if (r.date) {
+          const d = new Date(r.date);
+          if (!isNaN(d.getTime())) {
+            formattedDay = `${d.getMonth() + 1}月${d.getDate()}日`;
+          }
+        }
+
+        return {
+          "項次": index + 1,
+          "DAY": formattedDay,
+          "分類": r.category,
+          "幣別": r.currency,
+          "$": r.amount,
+          "刷卡金額": r.amount,
+          "卡號": r.cardNo,
+          "NTD": r.ntd === '' ? '' : r.ntd,
+          "TOTAL": r.total === '' ? '' : r.total,
+          "註": r.note,
+          "Check": ""
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      worksheet['!cols'] = [
+        { wch: 6 },  // 項次
+        { wch: 10 }, // DAY
+        { wch: 12 }, // 分類
+        { wch: 8 },  // 幣別
+        { wch: 12 }, // $
+        { wch: 12 }, // 刷卡金額
+        { wch: 10 }, // 卡號
+        { wch: 12 }, // NTD
+        { wch: 12 }, // TOTAL
+        { wch: 22 }, // 註
+        { wch: 10 }  // Check
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "差旅核銷表");
+
+      const today = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `出差差旅費報帳明細表_${today}.xlsx`);
     }
   </script>
 </body>
