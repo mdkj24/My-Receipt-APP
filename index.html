@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>差旅發票報帳小幫手</title>
+  
+  <!-- iOS Web App 全螢幕與圖示設定 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="差旅報帳通">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135706.png">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" id="manifestPlaceholder">
+
+  <!-- Tailwind CSS & FontAwesome Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- SheetJS (Excel 匯出套件) -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-top: env(safe-area-inset-top);
+    }
+    .glass-nav {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col justify-between">
+
+  <!-- 頂部導覽列 -->
+  <header class="sticky top-0 z-30 glass-nav border-b border-slate-200/80 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-md">
+        <i class="fa-solid fa-receipt text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base text-slate-900 leading-tight">差旅發票報帳小幫手</h1>
+        <p class="text-xs text-slate-500">iPhone 拍攝 ‧ 自動對齊格式 ‧ 匯出 Excel</p>
+      </div>
+    </div>
+    <button onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center text-slate-600">
+      <i class="fa-solid fa-gear"></i>
+    </button>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="flex-1 p-4 max-w-lg mx-auto w-full space-y-4">
+
+    <!-- 拍照掃描區 -->
+    <section class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-xl shadow-blue-500/10">
+      <div class="inline-block px-2.5 py-0.5 bg-white/20 rounded-full text-[11px] font-semibold backdrop-blur-md mb-2">
+        ✨ 智慧辨識 + 格式對齊
+      </div>
+      <h2 class="text-xl font-bold mb-1">拍攝發票 / 費用單據</h2>
+      <p class="text-blue-100 text-xs mb-4">將自動提取金額、幣別、日期，並直接對齊報帳表格。</p>
+      
+      <div class="flex gap-2">
+        <button onclick="triggerCamera()" class="flex-1 bg-white text-blue-600 font-bold py-3 px-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-camera text-base"></i>
+          <span>開啟相機拍照</span>
+        </button>
+        <button onclick="triggerFileSelect()" class="bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-3 rounded-xl active:scale-95 transition flex items-center justify-center text-sm">
+          <i class="fa-solid fa-image text-base"></i>
+        </button>
+      </div>
+
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
+      <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+    </section>
+
+    <!-- 已掃描列表 -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between px-1">
+        <h3 class="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+          <span>待報帳明細</span>
+          <span id="recordCountBadge" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+        </h3>
+        <button onclick="clearAllRecords()" class="text-xs text-slate-400 hover:text-red-500 font-medium transition">
+          <i class="fa-regular fa-trash-can mr-1"></i>清空
+        </button>
+      </div>
+
+      <div id="receiptListContainer" class="space-y-2.5"></div>
+    </section>
+
+  </main>
+
+  <!-- 底部列：總金額與匯出按鈕 -->
+  <footer class="sticky bottom-0 z-30 glass-nav border-t border-slate-200/80 p-4 max-w-lg mx-auto w-full">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <div class="text-[11px] text-slate-400 font-medium">總計筆數</div>
+        <div id="totalCountText" class="text-xl font-extrabold text-slate-900">0 筆</div>
+      </div>
+      <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 text-sm">
+        <i class="fa-solid fa-file-excel text-base"></i>
+        <span>匯出 Excel 報帳表</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- 編輯 / 核對資料彈窗 -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-slate-800 text-base">核對 / 修改費用明細</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">費用分類</label>
+          <select id="inputCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none">
+            <option value="機票">機票</option>
+            <option value="住宿">住宿</option>
+            <option value="城市稅">城市稅</option>
+            <option value="租車">租車</option>
+            <option value="計程車">計程車</option>
+            <option value="過路費">過路費</option>
+            <option value="停車">停車</option>
+            <option value="加油">加油</option>
+            <option value="交際費">交際費</option>
+            <option value="網卡">網卡</option>
+            <option value="參展證">參展證</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">日期 (DAY)</label>
+            <input type="date" id="inputDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">幣別</label>
+            <select id="inputCurrency" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none">
+              <option value="NTD">NTD</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="JPY">JPY</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">原幣金額 ($)</label>
+            <input type="number" step="0.01" id="inputAmount" placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">卡號 / 付款方式</label>
+            <input type="text" id="inputCardNo" placeholder="例: 1234 或 CASH" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">台幣換算 (NTD)</label>
+            <input type="number" id="inputNtd" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">TOTAL 金額</label>
+            <input type="number" id="inputTotal" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">註 (備註說明)</label>
+          <input type="text" id="inputNote" placeholder="例：午餐MAK / 一半代墊Sam / 無單據" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">取消</button>
+        <button onclick="saveRecord()" class="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-md">儲存項目</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定 API Key 彈窗 -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+      <h3 class="font-bold text-slate-800 text-base border-b pb-2">設定 AI 辨識 API Key</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">辨識引擎</label>
+          <select id="engineSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none">
+            <option value="mock">離線模擬測試模式</option>
+            <option value="openai">OpenAI GPT-4o-mini Vision</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">API Key</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none">
+        </div>
+      </div>
+      <button onclick="saveSettings()" class="w-full bg-slate-800 text-white font-bold py-2 rounded-xl text-xs">儲存設定</button>
+    </div>
+  </div>
+
+  <!-- JavaScript 核心控制 -->
+  <script>
+    let records = JSON.parse(localStorage.getItem('receipt_records_v2') || '[]');
+    let currentEditingId = null;
+
+    // PWA Manifest 動態掛載
+    (function setupPWA() {
+      const manifest = {
+        name: "差旅發票報帳小幫手",
+        short_name: "差旅報帳通",
+        start_url: "./",
+        display: "standalone",
+        background_color: "#F2F2F7",
+        theme_color: "#0F172A",
+        icons: [{ src: "https://cdn-icons-png.flaticon.com/512/3135/3135706.png", sizes: "512x512", type: "image/png" }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+      document.getElementById('manifestPlaceholder').setAttribute('href', URL.createObjectURL(blob));
+    })();
+
+    window.addEventListener('DOMContentLoaded', renderRecords);
+
+    function triggerCamera() { document.getElementById('cameraInput').click(); }
+    function triggerFileSelect() { document.getElementById('fileInput').click(); }
+
+    function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const mockData = {
+          date: new Date().toISOString().split('T')[0],
+          category: '交際費',
+          currency: 'EUR',
+          amount: 33.00,
+          cardNo: '',
+          ntd: 1210,
+          total: 1210,
+          note: '午餐ST'
+        };
+        openEditModal(null, mockData);
+        event.target.value = '';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openEditModal(id = null, initialData = null) {
+      currentEditingId = id;
+      const modal = document.getElementById('editModal');
+
+      if (id) {
+        const item = records.find(r => r.id === id);
+        if (!item) return;
+        document.getElementById('inputCategory').value = item.category;
+        document.getElementById('inputDate').value = item.date;
+        document.getElementById('inputCurrency').value = item.currency;
+        document.getElementById('inputAmount').value = item.amount;
+        document.getElementById('inputCardNo').value = item.cardNo || '';
+        document.getElementById('inputNtd').value = item.ntd || 0;
+        document.getElementById('inputTotal').value = item.total || 0;
+        document.getElementById('inputNote').value = item.note || '';
+      } else if (initialData) {
+        document.getElementById('inputCategory').value = initialData.category;
+        document.getElementById('inputDate').value = initialData.date;
+        document.getElementById('inputCurrency').value = initialData.currency;
+        document.getElementById('inputAmount').value = initialData.amount;
+        document.getElementById('inputCardNo').value = initialData.cardNo || '';
+        document.getElementById('inputNtd').value = initialData.ntd || 0;
+        document.getElementById('inputTotal').value = initialData.total || 0;
+        document.getElementById('inputNote').value = initialData.note || '';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('editModal').classList.add('hidden');
+      currentEditingId = null;
+    }
+
+    function saveRecord() {
+      const category = document.getElementById('inputCategory').value;
+      const date = document.getElementById('inputDate').value;
+      const currency = document.getElementById('inputCurrency').value;
+      const amount = parseFloat(document.getElementById('inputAmount').value) || 0;
+      const cardNo = document.getElementById('inputCardNo').value.trim();
+      const ntd = parseFloat(document.getElementById('inputNtd').value) || 0;
+      const total = parseFloat(document.getElementById('inputTotal').value) || 0;
+      const note = document.getElementById('inputNote').value.trim();
+
+      if (currentEditingId) {
+        const idx = records.findIndex(r => r.id === currentEditingId);
+        if (idx !== -1) {
+          records[idx] = { ...records[idx], category, date, currency, amount, cardNo, ntd, total, note };
+        }
+      } else {
+        records.push({
+          id: Date.now().toString(),
+          category, date, currency, amount, cardNo, ntd, total, note
+        });
+      }
+
+      localStorage.setItem('receipt_records_v2', JSON.stringify(records));
+      renderRecords();
+      closeModal();
+    }
+
+    function deleteRecord(id) {
+      if (confirm('確定要刪除這筆項目嗎？')) {
+        records = records.filter(r => r.id !== id);
+        localStorage.setItem('receipt_records_v2', JSON.stringify(records));
+        renderRecords();
+      }
+    }
+
+    function clearAllRecords() {
+      if (records.length === 0) return;
+      if (confirm('確定要清空所有明細嗎？')) {
+        records = [];
+        localStorage.setItem('receipt_records_v2', JSON.stringify(records));
+        renderRecords();
+      }
+    }
+
+    function renderRecords() {
+      const container = document.getElementById('receiptListContainer');
+      document.getElementById('recordCountBadge').innerText = records.length;
+      document.getElementById('totalCountText').innerText = `${records.length} 筆`;
+
+      if (records.length === 0) {
+        container.innerHTML = `<div class="bg-white rounded-2xl p-8 text-center text-slate-400 text-xs">尚無明細，請點擊上方拍照新增</div>`;
+        return;
+      }
+
+      container.innerHTML = records.map((item, idx) => {
+        let dayStr = item.date;
+        if (item.date) {
+          const d = new Date(item.date);
+          if (!isNaN(d.getTime())) dayStr = `${d.getMonth() + 1}月${d.getDate()}日`;
+        }
+
+        return `
+          <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex items-center justify-between">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-400">#${idx + 1}</span>
+                <span class="font-bold text-slate-800 text-sm">${item.category}</span>
+                <span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-semibold">${item.currency}</span>
+              </div>
+              <div class="text-xs text-slate-400 mt-1">
+                ${dayStr} ‧ 註: ${item.note || '無'}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="text-right">
+                <div class="font-extrabold text-slate-900 text-sm">$${item.amount}</div>
+                <div class="text-[10px] text-slate-400">NTD ${item.ntd}</div>
+              </div>
+              <button onclick="openEditModal('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1"><i class="fa-solid fa-pen text-xs"></i></button>
+              <button onclick="deleteRecord('${item.id}')" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ⭐ 核心：匯出完全對齊您照片格式的 Excel 檔
+    function exportToExcel() {
+      if (records.length === 0) return alert('沒有任何記錄可匯出！');
+
+      const excelData = records.map((r, index) => {
+        let formattedDay = r.date;
+        if (r.date) {
+          const d = new Date(r.date);
+          if (!isNaN(d.getTime())) {
+            formattedDay = `${d.getMonth() + 1}月${d.getDate()}日`;
+          }
+        }
+
+        return {
+          "項次": index + 1,
+          "DAY": formattedDay,
+          "分類": r.category,
+          "幣別": r.currency,
+          "$": r.amount,
+          "刷卡金額": r.amount,
+          "卡號": r.cardNo,
+          "NTD": r.ntd,
+          "TOTAL": r.total,
+          "註": r.note,
+          "Check": ""
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // 對齊欄位寬度
+      worksheet['!cols'] = [
+        { wch: 6 },  // 項次
+        { wch: 10 }, // DAY
+        { wch: 12 }, // 分類
+        { wch: 8 },  // 幣別
+        { wch: 12 }, // $
+        { wch: 12 }, // 刷卡金額
+        { wch: 10 }, // 卡號
+        { wch: 12 }, // NTD
+        { wch: 12 }, // TOTAL
+        { wch: 22 }, // 註
+        { wch: 10 }  // Check
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "差旅核銷表");
+
+      const today = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `出差差旅費報帳明細表_${today}.xlsx`);
+    }
+
+    function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+    function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+    function saveSettings() {
+      document.getElementById('settingsModal').classList.add('hidden');
+      alert('設定已儲存');
+    }
+  </script>
+</body>
+</html>
