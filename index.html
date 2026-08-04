@@ -3,19 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>差旅發票報帳小幫手</title>
+  <title>差旅發票報帳小幫手 (Debug 版)</title>
   
-  <!-- iOS Web App 設定 (加到主畫面全螢幕) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="差旅報帳通">
   <meta name="theme-color" content="#0F172A">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135706.png">
 
-  <!-- Dynamic PWA Manifest -->
   <link rel="manifest" id="manifestPlaceholder">
 
-  <!-- UI & Icon 資源 (Tailwind CSS + FontAwesome + SheetJS) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -48,15 +45,20 @@
         <p class="text-xs text-slate-500">Gemini 1.5 Flash 辨識 ‧ 匯出 Excel</p>
       </div>
     </div>
-    <button onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center text-slate-600">
-      <i class="fa-solid fa-gear"></i>
-    </button>
+    <div class="flex items-center gap-1">
+      <button onclick="toggleDebugConsole()" class="w-9 h-9 rounded-full bg-amber-100 hover:bg-amber-200 transition flex items-center justify-center text-amber-700 font-bold text-xs" title="查看 Debug 日誌">
+        <i class="fa-solid fa-bug"></i>
+      </button>
+      <button onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center text-slate-600">
+        <i class="fa-solid fa-gear"></i>
+      </button>
+    </div>
   </header>
 
   <!-- 主要內容區 -->
   <main class="flex-1 p-4 max-w-lg mx-auto w-full space-y-4">
 
-    <!-- 拍照與掃描卡片 -->
+    <!-- 拍照卡片 -->
     <section class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-xl shadow-blue-500/10">
       <div class="inline-block px-2.5 py-0.5 bg-white/20 rounded-full text-[11px] font-semibold backdrop-blur-md mb-2">
         ✨ Google Gemini 視覺 AI 驅動
@@ -74,12 +76,25 @@
         </button>
       </div>
 
-      <!-- 隱藏式 Input -->
       <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
       <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
     </section>
 
-    <!-- 辨識紀錄列表 -->
+    <!-- 🛠️ 內建 Debug 訊息視窗 (點上方 🐛 蟲蟲圖示開啟/關閉) -->
+    <section id="debugSection" class="hidden bg-slate-900 text-emerald-400 rounded-2xl p-4 font-mono text-xs shadow-lg space-y-2 border border-slate-700">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-2 text-slate-300">
+        <span class="font-bold flex items-center gap-1.5">
+          <i class="fa-solid fa-terminal text-amber-400"></i>
+          <span>即時除錯日誌 (Debug Logs)</span>
+        </span>
+        <button onclick="clearLogs()" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded">清空紀錄</button>
+      </div>
+      <div id="debugLogs" class="max-h-48 overflow-y-auto space-y-1 text-[11px] leading-relaxed break-all">
+        <div class="text-slate-500">> 系統初始化完成，等待拍照觸發...</div>
+      </div>
+    </section>
+
+    <!-- 明細列表 -->
     <section class="space-y-3">
       <div class="flex items-center justify-between px-1">
         <h3 class="font-bold text-slate-700 text-sm flex items-center gap-1.5">
@@ -96,7 +111,7 @@
 
   </main>
 
-  <!-- 底部固定邊界與匯出 -->
+  <!-- 底部列 -->
   <footer class="sticky bottom-0 z-30 glass-nav border-t border-slate-200/80 p-4 max-w-lg mx-auto w-full">
     <div class="flex items-center justify-between gap-3">
       <div>
@@ -110,7 +125,7 @@
     </div>
   </footer>
 
-  <!-- 編輯/核對彈窗 -->
+  <!-- 編輯彈窗 -->
   <div id="editModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b pb-3">
@@ -197,8 +212,8 @@
       <div class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">Google Gemini API Key</label>
-          <input type="password" id="apiKeyInput" placeholder="貼上 AIzaSy... 開頭的金鑰" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono outline-none">
-          <p class="text-[10px] text-slate-400 mt-1">金鑰僅會加密存在您手機本地存儲中。</p>
+          <input type="text" id="apiKeyInput" placeholder="貼上 AIzaSy... 開頭的金鑰" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono outline-none">
+          <p class="text-[10px] text-slate-400 mt-1">金鑰僅會儲存在您的手機瀏覽器中。</p>
         </div>
       </div>
       <div class="flex gap-2">
@@ -208,12 +223,40 @@
     </div>
   </div>
 
-  <!-- 核心邏輯腳本 -->
+  <!-- 核心邏輯與完整 Debug 監控機制 -->
   <script>
     let records = JSON.parse(localStorage.getItem('receipt_records_v3') || '[]');
     let currentEditingId = null;
 
-    // PWA Manifest 動態生成
+    // 🛠️ Log 寫入函數
+    function logDebug(msg, type = 'info') {
+      const logs = document.getElementById('debugLogs');
+      const time = new Date().toLocaleTimeString();
+      let colorClass = 'text-emerald-400';
+      if (type === 'error') colorClass = 'text-red-400 font-bold';
+      if (type === 'warn') colorClass = 'text-amber-300';
+      
+      const newLog = document.createElement('div');
+      newLog.className = colorClass;
+      newLog.innerText = `[${time}] ${msg}`;
+      logs.appendChild(newLog);
+      logs.scrollTop = logs.scrollHeight;
+
+      // 當有 Error 時自動展開 Debug 面板
+      if (type === 'error') {
+        document.getElementById('debugSection').classList.remove('hidden');
+      }
+    }
+
+    function toggleDebugConsole() {
+      document.getElementById('debugSection').classList.toggle('hidden');
+    }
+
+    function clearLogs() {
+      document.getElementById('debugLogs').innerHTML = '<div class="text-slate-500">> 日誌已清空...</div>';
+    }
+
+    // PWA Manifest
     (function setupPWA() {
       const manifest = {
         name: "差旅發票報帳小幫手",
@@ -232,14 +275,21 @@
       renderRecords();
       const savedKey = localStorage.getItem('ocr_apikey') || '';
       document.getElementById('apiKeyInput').value = savedKey;
+
+      if (savedKey) {
+        logDebug(`已讀取存儲的金鑰: ${savedKey.substring(0, 8)}... (長度: ${savedKey.length})`);
+      } else {
+        logDebug("未發現設定的金鑰，請先點擊右上角齒輪設定 API Key。", "warn");
+      }
     });
 
     function triggerCamera() { document.getElementById('cameraInput').click(); }
     function triggerFileSelect() { document.getElementById('fileInput').click(); }
 
-    // 🖼️ 圖片壓縮工具 (解決 iPhone 原圖檔案過大問題)
+    // 🖼️ 圖片壓縮小工具
     function compressImage(file, maxWidth) {
       return new Promise((resolve, reject) => {
+        logDebug(`正在讀取原始照片: ${file.name} (${Math.round(file.size / 1024)} KB)`);
         const img = new Image();
         img.src = URL.createObjectURL(file);
         img.onload = () => {
@@ -257,38 +307,47 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // 導出 JPEG 格式，品質 0.8
           const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          resolve(dataUrl.split(',')[1]);
+          const base64Str = dataUrl.split(',')[1];
+          logDebug(`圖片已壓縮為: ${width}x${height} (${Math.round(base64Str.length / 1024)} KB)`);
+          resolve(base64Str);
         };
-        img.onerror = (err) => reject(err);
+        img.onerror = (err) => {
+          logDebug("圖片壓縮失敗！", "error");
+          reject(err);
+        };
       });
     }
 
-    // ⚡ ⭐ 核心：直連 Gemini 1.5 Flash API (包含圖片壓縮與完整錯誤診斷)
+    // ⚡ ⭐ 帶有完整 Debug 捕捉的 API 發送邏輯
     async function handleFileSelected(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      const apiKey = localStorage.getItem('ocr_apikey');
+      const apiKey = localStorage.getItem('ocr_apikey')?.trim();
       if (!apiKey) {
-        alert("【尚未設定 API Key】\n請點擊右上角齒輪設定，貼上您的 Gemini API Key 才能啟用自動辨識！");
+        logDebug("用戶發起拍照，但 LocalStorage 中無 API Key！", "error");
+        alert("【尚未設定 API Key】\n請點擊右上角齒輪設定，貼上您的 Gemini API Key！");
         openSettingsModal();
         event.target.value = '';
         return;
       }
 
-      // 變更 UI 為辨識中狀態
+      logDebug(`準備發送請求至 Gemini API，使用的 Key: ${apiKey.substring(0, 6)}...`);
+
       const btnText = document.getElementById('camBtnText');
       const originalText = btnText ? btnText.innerText : '開啟相機拍照';
-      if (btnText) btnText.innerText = "圖片壓縮與 AI 辨識中...";
+      if (btnText) btnText.innerText = "圖片處理與 AI 辨識中...";
 
       try {
-        // 1. 先將 iPhone 照片壓縮至最長邊 1200px (防止傳輸失敗)
+        // 1. 圖片壓縮
         const base64Image = await compressImage(file, 1200);
 
-        // 2. 發送至 Google Gemini 1.5 Flash Vision API
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // 2. 發送至 Google Gemini 1.5 Flash API
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        logDebug(`正在請求 URL: https://generativelanguage.googleapis.com/...`);
+
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -304,17 +363,24 @@
           })
         });
 
+        logDebug(`HTTP 回應狀態碼: ${response.status} ${response.statusText}`);
+
         const resData = await response.json();
 
-        // API 報錯診斷
+        // 判斷 API 回傳錯誤
         if (resData.error) {
+          logDebug(`API 錯誤細節: [Code ${resData.error.code}] ${resData.error.message}`, "error");
+          if (resData.error.status) logDebug(`Status: ${resData.error.status}`, "error");
           throw new Error(`[Google API 錯誤 ${resData.error.code}]: ${resData.error.message}`);
         }
 
         if (!resData.candidates || !resData.candidates[0]) {
-          throw new Error("AI 無法解讀此照片，請重新拍攝清晰一點的發票。");
+          logDebug("API 未回應候選答案： " + JSON.stringify(resData), "error");
+          throw new Error("AI 未能從圖片中識別出文字。");
         }
 
-        // 3. 解析 AI 回傳數據
+        // 3. 解析 AI 回傳的文字
         let rawText = resData.candidates[0].content.parts[0].text.trim();
+        logDebug(`AI 原始回傳內容: ${rawText}`);
+
         rawText = rawText.replace(/
