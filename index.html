@@ -44,7 +44,7 @@
       </div>
       <div>
         <h1 class="font-bold text-base text-slate-900">差旅發票報帳小幫手</h1>
-        <p class="text-[11px] text-slate-500">Gemini 辨識 ‧ 匯出 Excel</p>
+        <p class="text-[11px] text-slate-500">Gemini 2.0 Flash 辨識 ‧ 匯出 Excel</p>
       </div>
     </div>
     <button onclick="toggleDebugConsole()" class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center" title="查看 Debug 日誌">
@@ -55,7 +55,7 @@
   <!-- 主要內容區 -->
   <main class="flex-1 p-4 max-w-lg mx-auto w-full space-y-4">
 
-    <!-- 🔑 第一步：API Key 常駐設定區 -->
+    <!-- 🔑 第一步：API Key 設定區 -->
     <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2">
       <div class="flex items-center justify-between">
         <label for="mainKeyInput" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -275,7 +275,7 @@
       });
     }
 
-    // ⚡ ⭐ 核心：自動選擇最新 Gemini 2.5 / 2.0 模型
+    // ⚡ ⭐ 核心：直連 Gemini 2.0 Flash 多模態模型
     async function handleFileSelected(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -291,15 +291,12 @@
 
       try {
         const base64 = await compressImg(file, 1200);
-        logDebug("照片壓縮完成，發送給 Google Gemini Flash AI...");
+        logDebug("照片壓縮完成，發送給 Google Gemini 2.0 Flash AI...");
 
-        // 優先嘗試使用最新的 gemini-2.5-flash
-        let modelName = 'gemini-2.5-flash'; 
-        let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        // 更新端點至最新穩定模型 gemini-2.0-flash
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        logDebug(`呼叫模型: ${modelName}`);
-
-        let res = await fetch(apiUrl, {
+        const res = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -312,31 +309,13 @@
           })
         });
 
-        // 備援機制：如果 2.5 找不到，退回至 2.0-flash
-        if (res.status === 404) {
-          logDebug("gemini-2.5-flash 未回應，切換至 gemini-2.0-flash...", "warn");
-          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-          res = await fetch(fallbackUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: '請分析發票照片，提取資訊並直接輸出嚴格 JSON 格式：{"date":"YYYY-MM-DD","category":"機票/住宿/城市稅/租車/計程車/過路費/停車/加油/交際費/網卡/參展證/其他","currency":"NTD/EUR/USD/JPY","amount":0.00,"cardNo":"卡號末四碼或CASH","note":"備註說明"}' },
-                  { inline_data: { mime_type: 'image/jpeg', data: base64 } }
-                ]
-              }]
-            })
-          });
-        }
-
         const data = await res.json();
         if (data.error) throw new Error(`[${data.error.code}] ${data.error.message}`);
 
         let text = data.candidates[0].content.parts[0].text.trim().replace(/```json|```/g, '');
         const parsed = JSON.parse(text);
 
-        logDebug("🎉 AI 辨識成功！請核對下方欄位", "info");
+        logDebug("🎉 AI 辨識成功！正在帶入欄位...", "info");
 
         const rates = { NTD: 1, EUR: 35, USD: 32, JPY: 0.22 };
         const rate = rates[parsed.currency] || 1;
