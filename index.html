@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>差旅發票報帳小幫手</title>
+  <title>差旅發票報帳小幫手 (純前端離線版)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,9 +13,13 @@
 
   <link rel="manifest" id="manifestPlaceholder">
 
+  <!-- UI & Icon 資源 -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS (Excel 匯出) -->
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <!-- Tesseract.js (純前端離線 OCR 引擎，免 API Key) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     body {
@@ -44,41 +48,24 @@
       </div>
       <div>
         <h1 class="font-bold text-base text-slate-900">差旅發票報帳小幫手</h1>
-        <p class="text-[11px] text-slate-500">Gemini 2.0 Flash 辨識 ‧ 匯出 Excel</p>
+        <p class="text-[11px] text-slate-500">離線 OCR 引擎 ‧ 免 API Key ‧ 匯出 Excel</p>
       </div>
     </div>
-    <button onclick="toggleDebugConsole()" class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center" title="查看 Debug 日誌">
-      <i class="fa-solid fa-bug"></i>
+    <button onclick="toggleDebugConsole()" class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center" title="查看 OCR 辨識結果">
+      <i class="fa-solid fa-terminal"></i>
     </button>
   </header>
 
   <!-- 主要內容區 -->
   <main class="flex-1 p-4 max-w-lg mx-auto w-full space-y-4">
 
-    <!-- 🔑 第一步：API Key 設定區 -->
-    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2">
-      <div class="flex items-center justify-between">
-        <label for="mainKeyInput" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-          <i class="fa-solid fa-key text-blue-600"></i>
-          <span>第一步：設定 Gemini API Key</span>
-        </label>
-        <span id="keyBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">未儲存</span>
-      </div>
-      <div class="space-y-2">
-        <input type="text" id="mainKeyInput" placeholder="在此處長按貼上 AIzaSy... 金鑰" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-900 focus:bg-white focus:border-blue-500 outline-none">
-        <button type="button" onclick="saveKeyDirectly()" class="w-full bg-slate-800 active:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs transition">
-          💾 儲存 API Key
-        </button>
-      </div>
-    </section>
-
-    <!-- 📷 第二步：相機拍攝區 -->
+    <!-- 📷 相機拍攝區 -->
     <section class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
       <div class="inline-block px-2.5 py-0.5 bg-white/20 rounded-full text-[11px] font-semibold mb-2">
-        ✨ 第二步：拍照自動辨識
+        🔒 100% 免費 ‧ 離線本地辨識 ‧ 無配額限制
       </div>
-      <h2 class="text-lg font-bold mb-1">拍攝發票或費用單據</h2>
-      <p class="text-blue-100 text-xs mb-4">系統將自動提取金額、幣別、日期並對齊報帳表格。</p>
+      <h2 class="text-lg font-bold mb-1">拍攝發票 / 費用單據</h2>
+      <p class="text-blue-100 text-xs mb-4">拍照後手機將自動掃描文字，提取日期與金額。</p>
       
       <div class="flex gap-2">
         <label for="cameraInput" class="flex-1 bg-white text-blue-600 font-bold py-3.5 px-4 rounded-xl shadow active:bg-blue-50 transition flex items-center justify-center gap-2 text-sm text-center cursor-pointer">
@@ -95,21 +82,21 @@
       <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
     </section>
 
-    <!-- 🐛 Debug 終端機面板 -->
+    <!-- 🐛 Debug 終端機面板 (顯示原始 OCR 掃描出來的所有字串) -->
     <section id="debugSection" class="hidden bg-slate-900 text-emerald-400 rounded-2xl p-4 font-mono text-xs shadow space-y-2">
       <div class="flex items-center justify-between border-b border-slate-700 pb-2 text-slate-300">
-        <span class="font-bold">即時除錯日誌 (Debug Logs)</span>
+        <span class="font-bold">OCR 掃描原始文字紀錄</span>
         <button onclick="clearLogs()" class="text-[10px] bg-slate-800 px-2 py-1 rounded">清空</button>
       </div>
       <div id="debugLogs" class="max-h-40 overflow-y-auto space-y-1 text-[11px] break-all"></div>
     </section>
 
-    <!-- 📝 第三步：資料核對與編輯區 -->
+    <!-- 📝 資料核對與編輯區 -->
     <section id="editArea" class="hidden bg-white rounded-2xl p-4 shadow border border-blue-200 space-y-3">
       <div class="flex items-center justify-between border-b pb-2">
         <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
           <i class="fa-solid fa-pen-to-square text-blue-600"></i>
-          <span>核對 / 修改 AI 辨識資料</span>
+          <span>核對 / 修改 掃描結果</span>
         </h3>
         <button onclick="closeEditArea()" class="text-xs text-slate-400">關閉</button>
       </div>
@@ -193,7 +180,7 @@
 
   </main>
 
-  <!-- 底部固定按鈕 -->
+  <!-- 底部固定匯出按鈕 -->
   <footer class="sticky bottom-0 z-20 glass-nav border-t border-slate-200 p-4 max-w-lg mx-auto w-full">
     <div class="flex items-center justify-between gap-3">
       <div>
@@ -208,8 +195,9 @@
   </footer>
 
   <script>
-    let records = JSON.parse(localStorage.getItem('receipt_records_v4') || '[]');
+    let records = JSON.parse(localStorage.getItem('receipt_records_v5') || '[]');
     let editingId = null;
+    let tesseractWorker = null;
 
     function logDebug(msg, type = 'info') {
       const logs = document.getElementById('debugLogs');
@@ -219,7 +207,6 @@
       div.innerText = `[${time}] ${msg}`;
       logs.appendChild(div);
       logs.scrollTop = logs.scrollHeight;
-      if (type === 'error') document.getElementById('debugSection').classList.remove('hidden');
     }
 
     function toggleDebugConsole() {
@@ -229,105 +216,104 @@
       document.getElementById('debugLogs').innerHTML = '';
     }
 
-    function saveKeyDirectly() {
-      const input = document.getElementById('mainKeyInput');
-      const val = input.value.trim();
-      if (!val) {
-        alert("請先輸入或貼上 API Key！");
-        return;
-      }
-      localStorage.setItem('ocr_apikey', val);
-      document.getElementById('keyBadge').innerText = "已儲存";
-      document.getElementById('keyBadge').className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700";
-      logDebug(`Key 已成功儲存: ${val.substring(0, 8)}...`);
-      alert("Gemini API Key 已成功儲存！");
-    }
+    (function setupPWA() {
+      const manifest = {
+        name: "差旅發票報帳小幫手",
+        short_name: "差旅報帳通",
+        start_url: "./",
+        display: "standalone",
+        background_color: "#F2F2F7",
+        theme_color: "#0F172A",
+        icons: [{ src: "https://cdn-icons-png.flaticon.com/512/3135/3135706.png", sizes: "512x512", type: "image/png" }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+      document.getElementById('manifestPlaceholder').setAttribute('href', URL.createObjectURL(blob));
+    })();
 
     window.addEventListener('DOMContentLoaded', () => {
       renderRecords();
-      const saved = localStorage.getItem('ocr_apikey') || '';
-      if (saved) {
-        document.getElementById('mainKeyInput').value = saved;
-        document.getElementById('keyBadge').innerText = "已儲存";
-        document.getElementById('keyBadge').className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700";
-        logDebug(`載入本地 Key: ${saved.substring(0, 8)}...`);
-      }
+      logDebug("離線模式已就緒，無須連線與 API Key。");
     });
 
-    function compressImg(file, maxWidth) {
-      return new Promise((resolve, reject) => {
-        logDebug(`處理圖片中: ${file.name || '相機拍攝'}`);
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-          let w = img.width, h = img.height;
-          if (w > maxWidth) {
-            h = Math.round((h * maxWidth) / w);
-            w = maxWidth;
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
-        };
-        img.onerror = (e) => reject(e);
-      });
-    }
-
-    // ⚡ ⭐ 核心：直連 Gemini 2.0 Flash 多模態模型
+    // ⚡ ⭐ 核心：純前端 Tesseract.js OCR 文字掃描與 RegEx 自動匹配
     async function handleFileSelected(e) {
       const file = e.target.files[0];
       if (!file) return;
 
-      const apiKey = localStorage.getItem('ocr_apikey')?.trim();
-      if (!apiKey) {
-        logDebug("無法發送：尚未儲存 API Key", "error");
-        alert("請先在第一步輸入框貼上 API Key 並點擊「儲存 API Key」！");
-        return;
-      }
-
-      document.getElementById('camText').innerText = "AI 辨識中...";
+      const btnText = document.getElementById('camText');
+      btnText.innerText = "手機本地掃描中...";
 
       try {
-        const base64 = await compressImg(file, 1200);
-        logDebug("照片壓縮完成，發送給 Google Gemini 2.0 Flash AI...");
+        logDebug("開始載入本地 OCR 引擎 (繁體中文+英文)...");
 
-        // 更新端點至最新穩定模型 gemini-2.0-flash
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        if (!tesseractWorker) {
+          tesseractWorker = await Tesseract.createWorker('chi_tra+eng');
+        }
 
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: '請分析發票照片，提取資訊並直接輸出嚴格 JSON 格式：{"date":"YYYY-MM-DD","category":"機票/住宿/城市稅/租車/計程車/過路費/停車/加油/交際費/網卡/參展證/其他","currency":"NTD/EUR/USD/JPY","amount":0.00,"cardNo":"卡號末四碼或CASH","note":"備註說明"}' },
-                { inline_data: { mime_type: 'image/jpeg', data: base64 } }
-              ]
-            }]
-          })
+        logDebug("正在分析圖片中的文字與數字...");
+        const ret = await tesseractWorker.recognize(file);
+        const text = ret.data.text;
+
+        logDebug("--- OCR 辨識出的文字原始內容 ---");
+        logDebug(text);
+        logDebug("-------------------------------");
+
+        // 1. 自動匹配日期 (RegEx 尋找 YYYY-MM-DD 或 YYYY/MM/DD)
+        let detectedDate = new Date().toISOString().split('T')[0];
+        const dateMatch = text.match(/\b(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
+        if (dateMatch) {
+          const y = dateMatch[1];
+          const m = dateMatch[2].padStart(2, '0');
+          const d = dateMatch[3].padStart(2, '0');
+          detectedDate = `${y}-${m}-${d}`;
+          logDebug(`匹配到日期: ${detectedDate}`);
+        }
+
+        // 2. 自動匹配金額 (尋找 $、EUR、NTD 或數字組合)
+        let detectedAmount = 0;
+        const amountMatches = [...text.matchAll(/(?:NTD|EUR|USD|\$|總計|金額|TOTAL)\s*[:：]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/gi)];
+        if (amountMatches.length > 0) {
+          // 取最後一個出現的匹配金額 (發票總額通常在下方)
+          const lastMatch = amountMatches[amountMatches.length - 1][1];
+          detectedAmount = parseFloat(lastMatch.replace(/,/g, '')) || 0;
+          logDebug(`匹配到金額: $${detectedAmount}`);
+        } else {
+          // 若無特徵詞，尋找較大的純數字
+          const pureNumbers = text.match(/\b\d{2,6}(?:\.\d{2})?\b/g);
+          if (pureNumbers) {
+            const numArr = pureNumbers.map(n => parseFloat(n)).filter(n => !isNaN(n));
+            detectedAmount = Math.max(...numArr, 0);
+            logDebug(`自動提取較大數字金額: $${detectedAmount}`);
+          }
+        }
+
+        // 3. 自動匹配幣別
+        let detectedCurrency = 'NTD';
+        if (/EUR|€/i.test(text)) detectedCurrency = 'EUR';
+        else if (/USD|\$/i.test(text)) detectedCurrency = 'USD';
+        else if (/JPY|￥/i.test(text)) detectedCurrency = 'JPY';
+
+        // 計算 NTD 金額
+        const rates = { NTD: 1, EUR: 35, USD: 32, JPY: 0.22 };
+        const rate = rates[detectedCurrency] || 1;
+        const calculatedNtd = detectedCurrency === 'NTD' ? detectedAmount : Math.round(detectedAmount * rate);
+
+        showEditArea({
+          date: detectedDate,
+          category: '其他',
+          currency: detectedCurrency,
+          amount: detectedAmount,
+          cardNo: '',
+          ntd: calculatedNtd,
+          total: calculatedNtd,
+          note: ''
         });
 
-        const data = await res.json();
-        if (data.error) throw new Error(`[${data.error.code}] ${data.error.message}`);
-
-        let text = data.candidates[0].content.parts[0].text.trim().replace(/```json|```/g, '');
-        const parsed = JSON.parse(text);
-
-        logDebug("🎉 AI 辨識成功！正在帶入欄位...", "info");
-
-        const rates = { NTD: 1, EUR: 35, USD: 32, JPY: 0.22 };
-        const rate = rates[parsed.currency] || 1;
-        const ntd = parsed.currency === 'NTD' ? parsed.amount : Math.round(parsed.amount * rate);
-
-        showEditArea({ ...parsed, ntd, total: ntd });
-
       } catch (err) {
-        logDebug(`辨識失敗: ${err.message}`, "error");
-        alert("辨識失敗：\n" + err.message);
+        logDebug(`OCR 處理失敗: ${err.message}`, "error");
+        alert("照片處理失敗：\n" + err.message);
       } finally {
-        document.getElementById('camText').innerText = "開啟相機拍照";
+        btnText.innerText = "開啟相機拍照";
         e.target.value = '';
       }
     }
@@ -381,7 +367,7 @@
         records.push(item);
       }
 
-      localStorage.setItem('receipt_records_v4', JSON.stringify(records));
+      localStorage.setItem('receipt_records_v5', JSON.stringify(records));
       renderRecords();
       closeEditArea();
     }
@@ -412,7 +398,7 @@
     function removeRecord(id) {
       if (confirm('確定刪除？')) {
         records = records.filter(r => r.id !== id);
-        localStorage.setItem('receipt_records_v4', JSON.stringify(records));
+        localStorage.setItem('receipt_records_v5', JSON.stringify(records));
         renderRecords();
       }
     }
@@ -420,7 +406,7 @@
     function clearAll() {
       if (records.length && confirm('確定清空？')) {
         records = [];
-        localStorage.setItem('receipt_records_v4', JSON.stringify(records));
+        localStorage.setItem('receipt_records_v5', JSON.stringify(records));
         renderRecords();
       }
     }
